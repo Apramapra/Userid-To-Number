@@ -5,43 +5,28 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# ---- Load data from both files and merge ----
-DATA = {}  # final combined dictionary
+# ---- Load data from tg_India.json (must be an array of user objects) ----
+DATA = {}  # final combined dictionary keyed by UserID
 
-# 1. Load tg_India.json
 try:
     with open("tg_India.json", "r", encoding="utf-8") as f:
-        json_data = json.load(f)
-    if isinstance(json_data, dict):
-        DATA.update(json_data)
+        raw_data = json.load(f)
+
+    if isinstance(raw_data, list):
+        for user in raw_data:
+            if "UserID" in user:
+                DATA[user["UserID"]] = user
+            else:
+                print("⚠️  Skipping entry missing 'UserID':", user)
+        print(f"✅ Loaded {len(DATA)} users from tg_India.json")
     else:
-        print("⚠️  tg_India.json is not a dictionary; skipping.")
+        print("⚠️  tg_India.json is not an array; expected format: [ {UserID: ..., ...}, ... ]")
+        DATA = {}
+
 except FileNotFoundError:
     print("⚠️  tg_India.json not found.")
 except json.JSONDecodeError:
     print("⚠️  tg_India.json is not valid JSON.")
-
-# 2. Load INDIAN_TG_NUMBERS.txt (overwrites duplicates)
-try:
-    with open("INDIAN_TG_NUMBERS.txt", "r", encoding="utf-8") as f:
-        content = f.read().strip()
-    # Try to parse as JSON
-    try:
-        txt_data = json.loads(content)
-        if isinstance(txt_data, dict):
-            DATA.update(txt_data)          # overwrite with .txt data
-        else:
-            # If it's a JSON array, convert to dict with array index as key? Not ideal.
-            # Better: treat as list of IDs and create simple records.
-            raise ValueError("Not a dict")
-    except (json.JSONDecodeError, ValueError):
-        # Not JSON → treat each line as a user ID
-        lines = [line.strip() for line in content.splitlines() if line.strip()]
-        for uid in lines:
-            DATA[uid] = {"id": uid, "info": "Data from INDIAN_TG_NUMBERS.txt"}
-        print(f"✅ Loaded {len(lines)} user IDs from INDIAN_TG_NUMBERS.txt (as simple records).")
-except FileNotFoundError:
-    print("⚠️  INDIAN_TG_NUMBERS.txt not found.")
 
 # ---- In‑memory code store ----
 CODES = {}
